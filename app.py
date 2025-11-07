@@ -86,12 +86,16 @@ def get_all_students_postgres():
         # Si PostgreSQL no está disponible, usar MongoDB
         return get_all_students_mongo()
 
-    cursor = conn.cursor()
-    # Traer TODOS los estudiantes ordenados alfabéticamente para el combobox
-    cursor.execute("SELECT nombre, apellido FROM estudiantes ORDER BY apellido, nombre")
-    students = [f"{row[0]} {row[1]}" for row in cursor.fetchall()]
-    cursor.close()
-    return students
+    try:
+        cursor = conn.cursor()
+        # Traer TODOS los estudiantes ordenados alfabéticamente para el combobox
+        cursor.execute("SELECT nombre, apellido FROM estudiantes ORDER BY apellido, nombre")
+        students = [f"{row[0]} {row[1]}" for row in cursor.fetchall()]
+        cursor.close()
+        return students
+    except Exception as e:
+        # Si hay error (ej: tabla no existe), usar MongoDB
+        return get_all_students_mongo()
 
 def get_all_students_mongo():
     """Obtiene lista de TODOS los estudiantes de MongoDB ordenados alfabéticamente"""
