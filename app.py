@@ -290,8 +290,8 @@ st.markdown("### Configuración de Búsqueda")
 num_searches = st.slider(
     "Cantidad de estudiantes a buscar (para mayor diferencia de tiempo):",
     min_value=1,
-    max_value=1000,
-    value=10,
+    max_value=10000,
+    value=100,
     help="Busca múltiples estudiantes para ver una diferencia de tiempo más evidente. Cuantos más, mayor será la diferencia entre SQL y NoSQL."
 )
 
