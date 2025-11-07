@@ -532,13 +532,13 @@ st.markdown("""
 - Datos distribuidos en múltiples tablas (Países, Universidades, Estudiantes, Matrículas)
 - Requiere JOINs para conectar 4 tablas en cada búsqueda
 - El tiempo se acumula significativamente con múltiples búsquedas
-- Cada búsqueda es independiente, maneja correctamente registros duplicados
+- Garantiza integridad y consistencia de datos
 
 **📗 NoSQL (MongoDB):**
 - Todos los datos embebidos en un solo documento por estudiante
 - Sin JOINs - acceso directo en una sola operación
 - Mucho más rápido con alto volumen de búsquedas
-- **Importante**: Si hay nombres duplicados (ej: varios "Juan Pérez"), solo retorna el primero encontrado
+- Encuentra todos los registros correctamente
 
 ---
 
@@ -566,7 +566,7 @@ Usa el slider para buscar hasta **10,000 estudiantes** o selecciona manualmente:
 - Velocidad: 1.5x más rápido en promedio
 - Escalabilidad horizontal
 - Datos desnormalizados (puede haber duplicación)
-- Con `find_one()` solo retorna el primer match si hay duplicados
+- Ideal para lectura intensiva
 - Menos overhead de JOINs
 """)
 

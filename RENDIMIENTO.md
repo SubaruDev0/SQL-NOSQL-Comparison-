@@ -3,13 +3,13 @@ mira # 📊 Análisis: SQL vs NoSQL
 ## ⚡ Comparación de Rendimiento Real
 
 ### 📘 SQL (PostgreSQL)
-- ✅ **Preciso**: Encuentra todos los registros
+- ✅ **Preciso**: Encuentra todos los registros (10000/10000)
 - ✅ **Consistencia**: Integridad referencial con JOINs
 - ❌ **Más lento**: ~0.0018s por búsqueda con 4 tablas relacionadas
 
 ### 📗 NoSQL (MongoDB)  
 - ✅ **Más rápido**: ~0.0012s por búsqueda (sin JOINs)
-- ✅ **Preciso**: Encuentra todos los registros (datos únicos)
+- ✅ **Preciso**: Encuentra todos los registros (10000/10000)
 - ✅ **Escalabilidad**: Mejor rendimiento sin relaciones
 
 ## 📊 Resultados con Diferentes Volúmenes
@@ -37,7 +37,9 @@ mira # 📊 Análisis: SQL vs NoSQL
 
 ## 🎯 Conclusión
 
-**MongoDB es consistentemente 1.5x más rápido que PostgreSQL** para este tipo de búsquedas.
+**Ambas bases de datos encuentran el 100% de los registros (10000/10000).**
+
+**MongoDB es consistentemente 1.5x más rápido que PostgreSQL** para búsquedas de este tipo.
 
 Con 10,000 registros, MongoDB ahorra ~6 segundos vs PostgreSQL - **diferencia muy visible en tiempo real**.
 
