@@ -1,6 +1,8 @@
 # 🔍 SQL vs NoSQL - Comparación de Rendimiento
 
-> Enlace de la demo desplegada: https://subarudev0-sql-nosql-comparison-app-1qvvcq.streamlit.app/
+> **🌐 Demo en línea:** https://subarudev0-sql-nosql-comparison--app-1qvvcq.streamlit.app/
+> 
+> ⚠️ **Nota:** En la versión desplegada, PostgreSQL no está disponible (Streamlit Cloud no soporta bases de datos locales). MongoDB funciona correctamente via MongoDB Atlas. Para ver la comparación completa con ambas bases de datos, ejecuta el proyecto localmente siguiendo las instrucciones abajo.
 
 Aplicación web que demuestra las diferencias de velocidad entre PostgreSQL (SQL) y MongoDB (NoSQL) al buscar datos en bases de datos extensas.
 
