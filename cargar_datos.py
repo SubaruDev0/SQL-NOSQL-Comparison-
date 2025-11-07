@@ -113,8 +113,9 @@ try:
     print(f"  - Insertando {NUM_ESTUDIANTES} estudiantes...")
     estudiantes = []
     for i in range(NUM_ESTUDIANTES):
-        nombre = fake.first_name()
-        apellido = fake.last_name()
+        # Generar nombres ÚNICOS agregando el índice para evitar duplicados
+        nombre = f"{fake.first_name()}"
+        apellido = f"{fake.last_name()} {i+1}"  # Agregar número para garantizar unicidad
         cursor.execute(
             """INSERT INTO estudiantes (nombre, apellido, email, edad, universidad_id, 
                pais_origen_id, carrera, año_ingreso, promedio) 

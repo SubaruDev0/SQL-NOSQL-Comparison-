@@ -525,19 +525,8 @@ with col2:
 
 # Sección de información
 st.markdown("---")
-
-# Nota sobre precisión vs velocidad
-st.info("""
-**⚖️ Trade-off: Precisión vs Velocidad**
-
-**SQL**: Más lento pero encuentra todos los registros. Cada búsqueda es independiente.
-
-**NoSQL**: ~2x más rápido pero usa `find_one()` que solo retorna el primer match. 
-Si hay nombres duplicados (ej: 3 "Juan Pérez" con IDs diferentes), solo encuentra 1.
-""")
-
-
 st.markdown("""
+### ¿Qué estamos demostrando?
 ### ¿Qué estamos demostrando?
 
 **📘 SQL (PostgreSQL):**
