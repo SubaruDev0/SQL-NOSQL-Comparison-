@@ -530,11 +530,12 @@ st.markdown("---")
 st.info("""
 **⚖️ Trade-off: Precisión vs Velocidad**
 
-**SQL**: Más lento pero 100% preciso. Los JOINs garantizan consistencia referencial.
+**SQL**: Más lento pero encuentra todos los registros. Cada búsqueda es independiente.
 
-**NoSQL**: ~2-3x más rápido, pero puede fallar con caracteres especiales o inconsistencias en nombres. 
-Los datos desnormalizados priorizan velocidad sobre precisión absoluta.
+**NoSQL**: ~2x más rápido pero usa `find_one()` que solo retorna el primer match. 
+Si hay nombres duplicados (ej: 3 "Juan Pérez" con IDs diferentes), solo encuentra 1.
 """)
+
 
 st.markdown("""
 ### ¿Qué estamos demostrando?
