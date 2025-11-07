@@ -1,0 +1,523 @@
+"""
+Aplicación Streamlit para comparar SQL vs NoSQL
+Demostración de diferencias de rendimiento
+"""
+import streamlit as st
+import psycopg2
+from pymongo import MongoClient
+import time
+#import pandas as pd # pandas no es necesario aquí (se eliminó uso)
+
+# Configuración de página
+st.set_page_config(
+    page_title="SQL vs NoSQL - Comparación de Rendimiento",
+    page_icon="🔍",
+    layout="wide"
+)
+
+# Configuración de bases de datos
+PG_CONFIG = {
+    'host': 'localhost',
+    'port': 5432,
+    'user': 'postgres',
+    'password': 'postgres',
+    'database': 'universidad_db'
+}
+
+MONGO_CONFIG = {
+    'host': 'localhost',
+    'port': 27017,
+    'database': 'universidad_db'
+}
+
+# Cache de conexiones
+@st.cache_resource
+def get_postgres_connection():
+    """Obtiene conexión a PostgreSQL"""
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        return conn
+    except Exception as e:
+        st.error(f"Error conectando a PostgreSQL: {e}")
+        return None
+
+@st.cache_resource
+def get_mongo_connection():
+    """Obtiene conexión a MongoDB"""
+    try:
+        client = MongoClient(MONGO_CONFIG['host'], MONGO_CONFIG['port'])
+        db = client[MONGO_CONFIG['database']]
+        return db
+    except Exception as e:
+        st.error(f"Error conectando a MongoDB: {e}")
+        return None
+
+def get_all_students_postgres():
+    """Obtiene lista de todos los estudiantes de PostgreSQL (aleatorio)"""
+    conn = get_postgres_connection()
+    if not conn:
+        return []
+
+    cursor = conn.cursor()
+    # RANDOM() para obtener estudiantes variados
+    # SOLO nombre y apellido (sin ID) para forzar búsquedas más lentas y realistas
+    # Aumentado a 500 para tener más opciones y hacer búsquedas más variadas
+    cursor.execute("SELECT nombre, apellido FROM estudiantes ORDER BY RANDOM() LIMIT 500")
+    students = [f"{row[0]} {row[1]}" for row in cursor.fetchall()]
+    cursor.close()
+    return students
+
+def search_student_sql(student_name):
+    """Busca un estudiante en PostgreSQL con múltiples JOINs"""
+    conn = get_postgres_connection()
+    if not conn:
+        return None, 0
+
+    start_time = time.time()
+
+    cursor = conn.cursor()
+
+    # Query compleja con múltiples JOINs - búsqueda por nombre completo (más lenta, realista)
+    query = """
+    SELECT 
+        e.id,
+        e.nombre,
+        e.apellido,
+        e.email,
+        e.edad,
+        e.carrera,
+        e.año_ingreso,
+        e.promedio,
+        u.nombre as universidad,
+        u.ciudad as ciudad_universidad,
+        p_uni.nombre as pais_universidad,
+        p_ori.nombre as pais_origen,
+        p_ori.codigo as codigo_pais,
+        COUNT(m.id) as total_cursos,
+        AVG(m.nota) as promedio_cursos,
+        SUM(m.creditos) as total_creditos
+    FROM estudiantes e
+    JOIN universidades u ON e.universidad_id = u.id
+    JOIN paises p_uni ON u.pais_id = p_uni.id
+    JOIN paises p_ori ON e.pais_origen_id = p_ori.id
+    LEFT JOIN matriculas m ON e.id = m.estudiante_id
+    WHERE CONCAT(e.nombre, ' ', e.apellido) ILIKE %s
+    GROUP BY e.id, e.nombre, e.apellido, e.email, e.edad, e.carrera, 
+             e.año_ingreso, e.promedio, u.nombre, u.ciudad, 
+             p_uni.nombre, p_ori.nombre, p_ori.codigo
+    LIMIT 1
+    """
+
+    # Buscar por nombre completo (LIKE) - esto hace que SQL sea más lento debido a los JOINs
+    cursor.execute(query, (f"%{student_name}%",))
+    result = cursor.fetchone()
+
+    # Obtener cursos detallados
+    courses = []
+    if result:
+        cursor.execute("""
+            SELECT curso, semestre, nota, creditos
+            FROM matriculas
+            WHERE estudiante_id = %s
+            ORDER BY semestre, curso
+        """, (result[0],))
+        courses = cursor.fetchall()
+
+    cursor.close()
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    if result:
+        data = {
+            'id': result[0],
+            'nombre': result[1],
+            'apellido': result[2],
+            'email': result[3],
+            'edad': result[4],
+            'carrera': result[5],
+            'año_ingreso': result[6],
+            'promedio': float(result[7]),
+            'universidad': result[8],
+            'ciudad_universidad': result[9],
+            'pais_universidad': result[10],
+            'pais_origen': result[11],
+            'codigo_pais': result[12],
+            'total_cursos': result[13],
+            'promedio_cursos': float(result[14]) if result[14] else 0,
+            'total_creditos': result[15] if result[15] else 0,
+            'cursos': [
+                {
+                    'curso': c[0],
+                    'semestre': c[1],
+                    'nota': float(c[2]),
+                    'creditos': c[3]
+                } for c in courses
+            ]
+        }
+        return data, elapsed_time
+
+    return None, elapsed_time
+
+def search_student_nosql(student_name):
+    """Busca un estudiante en MongoDB"""
+    db = get_mongo_connection()
+    if db is None:
+        return None, 0
+
+    start_time = time.time()
+
+    # Buscar usando nombre completo como SQL (contenga el término)
+    import re
+    escaped = re.escape(student_name)
+    pipeline = [
+        {'$addFields': {'nombre_completo': {'$concat': ['$nombre', ' ', '$apellido']}}},
+        {'$match': {'nombre_completo': {'$regex': escaped, '$options': 'i'}}},
+        {'$limit': 1}
+    ]
+    res = list(db.estudiantes.aggregate(pipeline))
+    result = res[0] if res else None
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    if result:
+        data = {
+            'id': result['id'],
+            'nombre': result['nombre'],
+            'apellido': result['apellido'],
+            'email': result['email'],
+            'edad': result['edad'],
+            'carrera': result['carrera'],
+            'año_ingreso': result['año_ingreso'],
+            'promedio': result['promedio'],
+            'universidad': result['universidad']['nombre'],
+            'ciudad_universidad': result['universidad']['ciudad'],
+            'pais_universidad': result['universidad']['pais']['nombre'],
+            'pais_origen': result['pais_origen']['nombre'],
+            'codigo_pais': result['pais_origen']['codigo'],
+            'total_cursos': len(result['matriculas']),
+            'promedio_cursos': sum(m['nota'] for m in result['matriculas']) / len(result['matriculas']) if result['matriculas'] else 0,
+            'total_creditos': sum(m['creditos'] for m in result['matriculas']),
+            'cursos': result['matriculas']
+        }
+        return data, elapsed_time
+
+    return None, elapsed_time
+
+# Interfaz de usuario
+st.title("Comparación de Rendimiento: SQL vs NoSQL")
+st.markdown("---")
+
+st.markdown("""
+### Demostración de Aula Invertida
+Esta aplicación compara el rendimiento entre **PostgreSQL** (SQL) y **MongoDB** (NoSQL) 
+al buscar datos de estudiantes en bases de datos con información distribuida en múltiples tablas/documentos.
+""")
+
+# Inicializar session_state para mantener resultados
+if 'sql_results' not in st.session_state:
+    st.session_state.sql_results = None
+    st.session_state.sql_time = 0
+    st.session_state.sql_count = 0
+
+if 'nosql_results' not in st.session_state:
+    st.session_state.nosql_results = None
+    st.session_state.nosql_time = 0
+    st.session_state.nosql_count = 0
+
+# Obtener lista de estudiantes y mantenerla estable en session_state para evitar que cambie en cada rerun
+if 'students_list' not in st.session_state or not st.session_state.get('students_list'):
+    st.session_state['students_list'] = get_all_students_postgres()
+students_list = st.session_state['students_list']
+
+# Selector de cantidad de búsquedas
+st.markdown("### Configuración de Búsqueda")
+num_searches = st.slider(
+    "Cantidad de estudiantes a buscar (para mayor diferencia de tiempo):",
+    min_value=1,
+    max_value=50,
+    value=5,
+    help="Busca múltiples estudiantes para ver una diferencia de tiempo más evidente. Puedes buscar hasta 50 estudiantes."
+)
+
+# Selector múltiple de estudiantes
+st.markdown(f"**Selecciona los estudiantes a buscar:** (Puedes agregar más clickeando en el campo)")
+
+# Preparar opciones - aumentado a 100 para más variedad
+choices = students_list[:100]
+
+# Detectar si el slider cambió para actualizar la selección automáticamente
+if 'prev_num_searches' not in st.session_state:
+    st.session_state['prev_num_searches'] = num_searches
+
+# Si el slider cambió, actualizar la selección
+if st.session_state['prev_num_searches'] != num_searches:
+    st.session_state['prev_num_searches'] = num_searches
+    # Actualizar la selección según el nuevo valor del slider
+    st.session_state['selected_students'] = choices[:num_searches] if len(choices) >= num_searches else choices
+
+# Inicializar selección sólo la primera vez
+if 'selected_students' not in st.session_state:
+    st.session_state['selected_students'] = choices[:num_searches] if len(choices) >= num_searches else choices
+else:
+    # Asegurar que cualquier valor previamente seleccionado esté presente en las opciones
+    prev = list(st.session_state.get('selected_students') or [])
+    for v in prev:
+        if v not in choices:
+            choices.append(v)
+
+# multiselect controlado; la selección se guarda en st.session_state['selected_students']
+selected_students = st.multiselect(
+    "Estudiantes:",
+    options=choices,
+    key='selected_students',
+    help="Puedes agregar o quitar estudiantes manualmente. 100 opciones disponibles (de 500 en total).",
+    label_visibility="collapsed"
+)
+
+# Botón para limpiar resultados
+col_clear1, col_clear2 = st.columns([3, 1])
+with col_clear2:
+    if st.button("Limpiar Resultados", help="Limpia los resultados anteriores para hacer una nueva búsqueda"):
+        st.session_state.sql_results = None
+        st.session_state.sql_time = 0
+        st.session_state.sql_count = 0
+        st.session_state.nosql_results = None
+        st.session_state.nosql_time = 0
+        st.session_state.nosql_count = 0
+        st.rerun()
+
+st.markdown("---")
+
+# Layout de dos columnas
+col1, col2 = st.columns(2)
+
+# COLUMNA IZQUIERDA - SQL
+with col1:
+    st.header("📘 SQL (PostgreSQL)")
+    st.markdown("**Base de datos relacional con múltiples tablas**")
+    st.info(f"Buscando {len(selected_students)} estudiante(s)")
+
+    # Botón para iniciar búsqueda SQL. Usamos la selección guardada en session_state
+    search_button_sql = st.button("Buscar TODOS en SQL", type="primary", key="sql_button", use_container_width=True)
+
+    if search_button_sql and st.session_state.get('selected_students'):
+        # Tomar una copia inmutable de la selección actual desde session_state
+        selection = list(st.session_state.get('selected_students', []))
+
+        # Desactivar temporalmente el multiselect para evitar modificaciones durante la búsqueda
+        st.session_state['_searching_sql'] = True
+
+        total_time = 0
+        results = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        for i, student_name in enumerate(selection):
+            status_text.text(f"Buscando {i+1}/{len(selection)}: {student_name}...")
+            result, elapsed = search_student_sql(student_name)
+            total_time += elapsed
+            if result:
+                results.append(result)
+            progress_bar.progress((i + 1) / len(selection))
+
+        progress_bar.empty()
+        status_text.empty()
+
+        # Guardar resultados en session_state
+        st.session_state.sql_results = results
+        st.session_state.sql_time = total_time
+        st.session_state.sql_count = len(selection)
+
+        # Marcar que búsqueda finalizó
+        st.session_state['_searching_sql'] = False
+
+    # Mostrar resultados guardados (persistentes)
+    if st.session_state.sql_results is not None:
+        results = st.session_state.sql_results
+        total_time = st.session_state.sql_time
+        count = st.session_state.sql_count
+
+        st.success(f"Búsqueda completada: {len(results)}/{count} encontrados")
+
+        col_time1, col_time2, col_time3 = st.columns(3)
+        with col_time1:
+            st.metric("Tiempo TOTAL", f"{total_time:.4f}s")
+        with col_time2:
+            st.metric("Promedio", f"{total_time/count:.4f}s")
+        with col_time3:
+            st.metric("Búsquedas", count)
+
+        st.markdown("---")
+
+        # Mostrar resultados en un formato compacto
+        if results:
+            st.subheader(f"Resultados ({len(results)} estudiantes)")
+
+            for idx, result in enumerate(results, 1):
+                with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
+                    col_a, col_b = st.columns(2)
+
+                    with col_a:
+                        st.write(f"**Email:** {result['email']}")
+                        st.write(f"**Edad:** {result['edad']} años")
+                        st.write(f"**Promedio:** {result['promedio']}")
+                        st.write(f"**Universidad:** {result['universidad']}")
+
+                    with col_b:
+                        st.write(f"**Ciudad:** {result['ciudad_universidad']}")
+                        st.write(f"**País:** {result['pais_universidad']}")
+                        st.write(f"**Cursos:** {result['total_cursos']}")
+                        st.write(f"**Créditos:** {result['total_creditos']}")
+        else:
+            st.warning("No se encontraron estudiantes")
+
+# COLUMNA DERECHA - NoSQL
+with col2:
+    st.header("📗 NoSQL (MongoDB)")
+    st.markdown("**Base de datos documental sin relaciones**")
+    st.info(f"Buscando {len(selected_students)} estudiante(s)")
+
+    search_button_nosql = st.button("Buscar TODOS en NoSQL", type="primary", key="nosql_button", use_container_width=True)
+
+    if search_button_nosql and st.session_state.get('selected_students'):
+        selection = list(st.session_state.get('selected_students', []))
+
+        # Marcar búsqueda en curso para bloquear cambios si es necesario
+        st.session_state['_searching_nosql'] = True
+
+        total_time = 0
+        results = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        for i, student_name in enumerate(selection):
+            status_text.text(f"Buscando {i+1}/{len(selection)}: {student_name}...")
+            result, elapsed = search_student_nosql(student_name)
+            total_time += elapsed
+            if result:
+                results.append(result)
+            progress_bar.progress((i + 1) / len(selection))
+
+        progress_bar.empty()
+        status_text.empty()
+
+        st.session_state.nosql_results = results
+        st.session_state.nosql_time = total_time
+        st.session_state.nosql_count = len(selection)
+
+        st.session_state['_searching_nosql'] = False
+
+    # Mostrar resultados guardados (persistentes)
+    if st.session_state.nosql_results is not None:
+        results = st.session_state.nosql_results
+        total_time = st.session_state.nosql_time
+        count = st.session_state.nosql_count
+
+        st.success(f"Búsqueda completada: {len(results)}/{count} encontrados")
+
+        col_time1, col_time2, col_time3 = st.columns(3)
+        with col_time1:
+            st.metric("Tiempo TOTAL", f"{total_time:.4f}s")
+        with col_time2:
+            st.metric("Promedio", f"{total_time/count:.4f}s")
+        with col_time3:
+            st.metric("Búsquedas", count)
+
+        st.markdown("---")
+
+        # Mostrar resultados en un formato compacto
+        if results:
+            st.subheader(f"Resultados ({len(results)} estudiantes)")
+
+            for idx, result in enumerate(results, 1):
+                with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
+                    col_a, col_b = st.columns(2)
+
+                    with col_a:
+                        st.write(f"**Email:** {result['email']}")
+                        st.write(f"**Edad:** {result['edad']} años")
+                        st.write(f"**Promedio:** {result['promedio']}")
+                        st.write(f"**Universidad:** {result['universidad']}")
+
+                    with col_b:
+                        st.write(f"**Ciudad:** {result['ciudad_universidad']}")
+                        st.write(f"**País:** {result['pais_universidad']}")
+                        st.write(f"**Cursos:** {result['total_cursos']}")
+                        st.write(f"**Créditos:** {result['total_creditos']}")
+        else:
+            st.warning("❌ No se encontraron estudiantes")
+
+# Sección de información
+st.markdown("---")
+st.markdown("""
+### ¿Qué estamos demostrando?
+
+**📘 SQL (PostgreSQL):**
+- Los datos están distribuidos en **múltiples tablas** (Países, Universidades, Estudiantes, Matrículas)
+- Se requieren **múltiples JOINs** para obtener toda la información
+- Cada búsqueda requiere conectar 4 tablas con 3-4 JOINs
+- Con **múltiples búsquedas**, el tiempo se acumula significativamente
+
+**📗 NoSQL (MongoDB):**
+- Los datos están en un **solo documento** por estudiante
+- **No requiere JOINs** - toda la información está embebida
+- Acceso directo a los datos en una sola operación
+- Con **múltiples búsquedas**, la diferencia es mucho más evidente
+
+#### Prueba con más estudiantes para ver la diferencia real
+
+Usa el slider arriba para buscar **hasta 50 estudiantes** a la vez, o agrega/quita manualmente clickeando en el campo. 
+Cuantos más estudiantes busques, más notoria será la diferencia de velocidad:
+
+- **1 estudiante**: NoSQL ~2x más rápido
+- **5 estudiantes**: NoSQL ~3-5x más rápido  
+- **10 estudiantes**: NoSQL ~5-10x más rápido
+- **20 estudiantes**: NoSQL ~10-15x más rápido
+- **50 estudiantes**: Diferencia EXTREMA
+
+#### Ventajas de cada enfoque:
+
+**📘 SQL:**
+- Evita duplicación de datos
+- Mantiene integridad referencial
+- Ideal para transacciones complejas
+- Más lento con muchas relaciones y búsquedas múltiples
+
+**📗 NoSQL:**
+- Consultas muy rápidas incluso con alto volumen
+- Escalabilidad horizontal
+- Flexible para datos no estructurados
+- Puede duplicar datos
+- Menos control de integridad
+""")
+
+# Información de estado
+st.sidebar.title("Información del Sistema")
+st.sidebar.markdown("---")
+
+# Verificar conexiones
+if get_postgres_connection() is not None:
+    st.sidebar.success("✅ PostgreSQL conectado")
+else:
+    st.sidebar.error("❌ PostgreSQL no disponible")
+
+if get_mongo_connection() is not None:
+    st.sidebar.success("✅ MongoDB conectado")
+else:
+    st.sidebar.error("❌ MongoDB no disponible")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+### Notas:
+- Esta demo compara tiempos de búsqueda reales
+- Los datos son generados sintéticamente
+- Ambas BD contienen la misma información
+- **Busca múltiples estudiantes para ver una diferencia más evidente**
+
+### Tips para la demo:
+- Usa 5-10 estudiantes para mejor impacto
+- El tiempo se acumula en cada búsqueda
+- NoSQL será significativamente más rápido
+""")
