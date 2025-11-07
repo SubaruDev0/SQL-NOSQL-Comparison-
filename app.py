@@ -215,11 +215,16 @@ def search_student_nosql(student_name):
     parts = student_name.strip().split(maxsplit=1)
     if len(parts) == 2:
         nombre, apellido = parts
-        # Búsqueda exacta usando índice compuesto (nombre, apellido)
-        result = db.estudiantes.find_one({'nombre': nombre, 'apellido': apellido})
+        # Búsqueda case-insensitive usando regex para coincidir con PostgreSQL ILIKE
+        result = db.estudiantes.find_one({
+            'nombre': {'$regex': f'^{nombre}$', '$options': 'i'},
+            'apellido': {'$regex': f'^{apellido}$', '$options': 'i'}
+        })
     else:
-        # Si solo hay una palabra, buscar por apellido
-        result = db.estudiantes.find_one({'apellido': student_name.strip()})
+        # Si solo hay una palabra, buscar por apellido case-insensitive
+        result = db.estudiantes.find_one({
+            'apellido': {'$regex': f'^{student_name.strip()}$', '$options': 'i'}
+        })
 
     end_time = time.time()
     elapsed_time = end_time - start_time
