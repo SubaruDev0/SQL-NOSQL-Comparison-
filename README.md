@@ -1,6 +1,6 @@
 # 🔍 SQL vs NoSQL - Comparación de Rendimiento
 
-> Enlace de la demo desplegada: https://subarudev0-sql-nosql-comparison-app
+> Enlace de la demo desplegada: https://subarudev0-sql-nosql-comparison-app-1qvvcq.streamlit.app/
 
 Aplicación web que demuestra las diferencias de velocidad entre PostgreSQL (SQL) y MongoDB (NoSQL) al buscar datos en bases de datos extensas.
 
