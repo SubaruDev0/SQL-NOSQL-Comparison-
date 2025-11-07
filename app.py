@@ -527,45 +527,47 @@ with col2:
 st.markdown("---")
 st.markdown("""
 ### ¿Qué estamos demostrando?
-### ¿Qué estamos demostrando?
 
 **📘 SQL (PostgreSQL):**
-- Los datos están distribuidos en **múltiples tablas** (Países, Universidades, Estudiantes, Matrículas)
-- Se requieren **múltiples JOINs** para obtener toda la información
-- Cada búsqueda requiere conectar 4 tablas con 3-4 JOINs
-- Con **múltiples búsquedas**, el tiempo se acumula significativamente
+- Datos distribuidos en múltiples tablas (Países, Universidades, Estudiantes, Matrículas)
+- Requiere JOINs para conectar 4 tablas en cada búsqueda
+- El tiempo se acumula significativamente con múltiples búsquedas
+- Cada búsqueda es independiente, maneja correctamente registros duplicados
 
 **📗 NoSQL (MongoDB):**
-- Los datos están en un **solo documento** por estudiante
-- **No requiere JOINs** - toda la información está embebida
-- Acceso directo a los datos en una sola operación
-- Con **múltiples búsquedas**, la diferencia es mucho más evidente
+- Todos los datos embebidos en un solo documento por estudiante
+- Sin JOINs - acceso directo en una sola operación
+- Mucho más rápido con alto volumen de búsquedas
+- **Importante**: Si hay nombres duplicados (ej: varios "Juan Pérez"), solo retorna el primero encontrado
 
-#### Prueba con más estudiantes para ver la diferencia real
+---
 
-Usa el slider arriba para buscar **hasta 50 estudiantes** a la vez, o agrega/quita manualmente clickeando en el campo. 
-Cuantos más estudiantes busques, más notoria será la diferencia de velocidad:
+### Prueba con diferentes volúmenes
 
-- **1 estudiante**: NoSQL ~2x más rápido
-- **5 estudiantes**: NoSQL ~3-5x más rápido  
-- **10 estudiantes**: NoSQL ~5-10x más rápido
-- **20 estudiantes**: NoSQL ~10-15x más rápido
-- **50 estudiantes**: Diferencia EXTREMA
+Usa el slider para buscar hasta **10,000 estudiantes** o selecciona manualmente:
 
-#### Ventajas de cada enfoque:
+- **100 búsquedas**: Diferencia notoria (~0.06s de ahorro)
+- **1,000 búsquedas**: MongoDB claramente más rápido (~0.6s de ahorro)
+- **5,000 búsquedas**: Diferencia muy visible (~3s de ahorro)
+- **10,000 búsquedas**: Diferencia DRAMÁTICA (~6s de ahorro)
+
+---
+
+### Trade-offs de cada enfoque
 
 **📘 SQL:**
-- Evita duplicación de datos
-- Mantiene integridad referencial
+- Normalización de datos (sin duplicación)
+- Integridad referencial garantizada
 - Ideal para transacciones complejas
-- Más lento con muchas relaciones y búsquedas múltiples
+- Maneja correctamente duplicados
+- Más lento con múltiples relaciones
 
 **📗 NoSQL:**
-- Consultas muy rápidas incluso con alto volumen
+- Velocidad: 1.5x más rápido en promedio
 - Escalabilidad horizontal
-- Flexible para datos no estructurados
-- Puede duplicar datos
-- Menos control de integridad
+- Datos desnormalizados (puede haber duplicación)
+- Con `find_one()` solo retorna el primer match si hay duplicados
+- Menos overhead de JOINs
 """)
 
 # Información de estado
