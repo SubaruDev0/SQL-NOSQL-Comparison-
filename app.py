@@ -53,16 +53,14 @@ def get_mongo_connection():
         return None
 
 def get_all_students_postgres():
-    """Obtiene lista de todos los estudiantes de PostgreSQL (aleatorio)"""
+    """Obtiene lista de TODOS los estudiantes de PostgreSQL ordenados alfabéticamente"""
     conn = get_postgres_connection()
     if not conn:
         return []
 
     cursor = conn.cursor()
-    # RANDOM() para obtener estudiantes variados
-    # SOLO nombre y apellido (sin ID) para forzar búsquedas más lentas y realistas
-    # Aumentado a 500 para tener más opciones y hacer búsquedas más variadas
-    cursor.execute("SELECT nombre, apellido FROM estudiantes ORDER BY RANDOM() LIMIT 500")
+    # Traer TODOS los estudiantes ordenados alfabéticamente para el combobox
+    cursor.execute("SELECT nombre, apellido FROM estudiantes ORDER BY apellido, nombre")
     students = [f"{row[0]} {row[1]}" for row in cursor.fetchall()]
     cursor.close()
     return students
@@ -160,23 +158,22 @@ def search_student_sql(student_name):
     return None, elapsed_time
 
 def search_student_nosql(student_name):
-    """Busca un estudiante en MongoDB"""
+    """Busca un estudiante en MongoDB - Optimizado con índices"""
     db = get_mongo_connection()
     if db is None:
         return None, 0
 
     start_time = time.time()
 
-    # Buscar usando nombre completo como SQL (contenga el término)
-    import re
-    escaped = re.escape(student_name)
-    pipeline = [
-        {'$addFields': {'nombre_completo': {'$concat': ['$nombre', ' ', '$apellido']}}},
-        {'$match': {'nombre_completo': {'$regex': escaped, '$options': 'i'}}},
-        {'$limit': 1}
-    ]
-    res = list(db.estudiantes.aggregate(pipeline))
-    result = res[0] if res else None
+    # Separar nombre y apellido para búsqueda indexada eficiente
+    parts = student_name.strip().split(maxsplit=1)
+    if len(parts) == 2:
+        nombre, apellido = parts
+        # Búsqueda exacta usando índice compuesto (nombre, apellido)
+        result = db.estudiantes.find_one({'nombre': nombre, 'apellido': apellido})
+    else:
+        # Si solo hay una palabra, buscar por apellido
+        result = db.estudiantes.find_one({'apellido': student_name.strip()})
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -236,16 +233,16 @@ st.markdown("### Configuración de Búsqueda")
 num_searches = st.slider(
     "Cantidad de estudiantes a buscar (para mayor diferencia de tiempo):",
     min_value=1,
-    max_value=50,
-    value=5,
-    help="Busca múltiples estudiantes para ver una diferencia de tiempo más evidente. Puedes buscar hasta 50 estudiantes."
+    max_value=1000,
+    value=10,
+    help="Busca múltiples estudiantes para ver una diferencia de tiempo más evidente. Cuantos más, mayor será la diferencia entre SQL y NoSQL."
 )
 
 # Selector múltiple de estudiantes
 st.markdown(f"**Selecciona los estudiantes a buscar:** (Puedes agregar más clickeando en el campo)")
 
-# Preparar opciones - aumentado a 100 para más variedad
-choices = students_list[:100]
+# Preparar opciones - TODOS los estudiantes disponibles
+choices = students_list
 
 # Detectar si el slider cambió para actualizar la selección automáticamente
 if 'prev_num_searches' not in st.session_state:
@@ -272,7 +269,7 @@ selected_students = st.multiselect(
     "Estudiantes:",
     options=choices,
     key='selected_students',
-    help="Puedes agregar o quitar estudiantes manualmente. 100 opciones disponibles (de 500 en total).",
+    help="Puedes buscar cualquier estudiante por nombre. Escribe para filtrar la lista.",
     label_visibility="collapsed"
 )
 

@@ -1,5 +1,7 @@
 # 🔍 SQL vs NoSQL - Comparación de Rendimiento
 
+> Enlace de la demo desplegada: https://subarudev0-sql-nosql-comparison-app
+
 Aplicación web que demuestra las diferencias de velocidad entre PostgreSQL (SQL) y MongoDB (NoSQL) al buscar datos en bases de datos extensas.
 
 ## 📋 ¿Qué hace este proyecto?
@@ -67,19 +69,20 @@ net:
   bindIp: 127.0.0.1
 EOF
 
-# Crear servicio systemd
+# Crear servicio systemd (versión mejorada sin --fork para evitar problemas de PID)
 sudo tee /etc/systemd/system/mongod.service > /dev/null <<EOF
 [Unit]
 Description=MongoDB Database Server
 After=network.target
 
 [Service]
-Type=forking
+# Usar Type=simple y NO usar --fork: systemd gestiona el proceso directamente.
+Type=simple
 User=mongodb
 Group=mongodb
-ExecStart=/opt/mongodb/mongod --config /etc/mongod.conf --fork
-PIDFile=/tmp/mongodb-27017.pid
+ExecStart=/opt/mongodb/mongod --config /etc/mongod.conf
 Restart=on-failure
+# Opcional: limitar memoria, añadir watchdog, etc.
 
 [Install]
 WantedBy=multi-user.target
