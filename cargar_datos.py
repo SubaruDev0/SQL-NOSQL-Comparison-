@@ -122,7 +122,7 @@ try:
             (nombre, apellido, fake.email(), random.randint(18, 30),
              random.choice(universidades_ids), random.choice(paises_ids),
              random.choice(CARRERAS), random.randint(2018, 2024),
-             round(random.uniform(6.0, 10.0), 2))
+             round(random.uniform(6.0, 9.99), 2))
         )
         est_id = cursor.fetchone()[0]
         estudiantes.append({'id': est_id, 'nombre': nombre, 'apellido': apellido})
@@ -134,7 +134,7 @@ try:
                 """INSERT INTO matriculas (estudiante_id, curso, semestre, nota, creditos)
                    VALUES (%s, %s, %s, %s, %s)""",
                 (est_id, random.choice(CURSOS), f"2024-{random.randint(1,2)}",
-                 round(random.uniform(6.0, 10.0), 2), random.choice([3, 4, 5]))
+                 round(random.uniform(6.0, 9.99), 2), random.choice([3, 4, 5]))
             )
         
         if (i + 1) % 100 == 0:
