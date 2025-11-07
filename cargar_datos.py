@@ -15,10 +15,10 @@ print("CARGANDO DATOS EN BASES DE DATOS")
 print("="*70)
 
 # Configuración
-NUM_PAISES = 30
-NUM_UNIVERSIDADES = 50
-NUM_ESTUDIANTES = 500  # Reducido para ser más rápido
-CURSOS = ['Matemáticas I', 'Física I', 'Química', 'Programación', 'Estadística', 
+NUM_PAISES = 50
+NUM_UNIVERSIDADES = 80
+NUM_ESTUDIANTES = 1000  # Aumentado para coincidir con el slider máximo
+CURSOS = ['Matemáticas I', 'Física I', 'Química', 'Programación', 'Estadística',
           'Literatura', 'Historia', 'Biología', 'Inglés', 'Filosofía']
 CARRERAS = ['Ingeniería Informática', 'Medicina', 'Derecho', 'Economía', 
             'Arquitectura', 'Psicología', 'Biología', 'Matemáticas']
