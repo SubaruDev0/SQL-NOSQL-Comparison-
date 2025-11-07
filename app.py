@@ -16,6 +16,11 @@ st.set_page_config(
 )
 
 # Configuración de bases de datos
+import os
+
+# Detectar si estamos en Streamlit Cloud
+IS_CLOUD = os.getenv('STREAMLIT_SHARING_MODE') is not None or os.getenv('STREAMLIT_CLOUD') is not None
+
 PG_CONFIG = {
     'host': 'localhost',
     'port': 5432,
@@ -24,16 +29,30 @@ PG_CONFIG = {
     'database': 'universidad_db'
 }
 
-MONGO_CONFIG = {
-    'host': 'localhost',
-    'port': 27017,
-    'database': 'universidad_db'
-}
+# MongoDB: usar Atlas si está en la nube, local si no
+if IS_CLOUD:
+    # Conexión a MongoDB Atlas (nube)
+    MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://cluster0.mongodb.net/')
+    MONGO_CONFIG = {
+        'uri': MONGO_URI,
+        'database': 'universidad_db'
+    }
+else:
+    # Conexión local
+    MONGO_CONFIG = {
+        'host': 'localhost',
+        'port': 27017,
+        'database': 'universidad_db'
+    }
 
 # Cache de conexiones
 @st.cache_resource
 def get_postgres_connection():
     """Obtiene conexión a PostgreSQL"""
+    # Si estamos en la nube, no intentar conectar
+    if IS_CLOUD:
+        return None
+
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         return conn
@@ -45,8 +64,16 @@ def get_postgres_connection():
 def get_mongo_connection():
     """Obtiene conexión a MongoDB"""
     try:
-        client = MongoClient(MONGO_CONFIG['host'], MONGO_CONFIG['port'])
+        if IS_CLOUD and 'uri' in MONGO_CONFIG:
+            # Conexión a MongoDB Atlas
+            client = MongoClient(MONGO_CONFIG['uri'])
+        else:
+            # Conexión local
+            client = MongoClient(MONGO_CONFIG['host'], MONGO_CONFIG['port'])
+
         db = client[MONGO_CONFIG['database']]
+        # Verificar conexión
+        db.list_collection_names()
         return db
     except Exception as e:
         st.error(f"Error conectando a MongoDB: {e}")
@@ -56,7 +83,8 @@ def get_all_students_postgres():
     """Obtiene lista de TODOS los estudiantes de PostgreSQL ordenados alfabéticamente"""
     conn = get_postgres_connection()
     if not conn:
-        return []
+        # Si PostgreSQL no está disponible, usar MongoDB
+        return get_all_students_mongo()
 
     cursor = conn.cursor()
     # Traer TODOS los estudiantes ordenados alfabéticamente para el combobox
@@ -64,6 +92,20 @@ def get_all_students_postgres():
     students = [f"{row[0]} {row[1]}" for row in cursor.fetchall()]
     cursor.close()
     return students
+
+def get_all_students_mongo():
+    """Obtiene lista de TODOS los estudiantes de MongoDB ordenados alfabéticamente"""
+    db = get_mongo_connection()
+    if not db:
+        return []
+
+    try:
+        # Obtener todos los estudiantes y ordenar
+        students = db.estudiantes.find({}, {'nombre': 1, 'apellido': 1}).sort([('apellido', 1), ('nombre', 1)])
+        return [f"{s['nombre']} {s['apellido']}" for s in students]
+    except Exception as e:
+        st.error(f"Error obteniendo estudiantes: {e}")
+        return []
 
 def search_student_sql(student_name):
     """Busca un estudiante en PostgreSQL con múltiples JOINs"""
@@ -294,81 +336,101 @@ col1, col2 = st.columns(2)
 with col1:
     st.header("📘 SQL (PostgreSQL)")
     st.markdown("**Base de datos relacional con múltiples tablas**")
-    st.info(f"Buscando {len(selected_students)} estudiante(s)")
 
-    # Botón para iniciar búsqueda SQL. Usamos la selección guardada en session_state
-    search_button_sql = st.button("Buscar TODOS en SQL", type="primary", key="sql_button", use_container_width=True)
-
-    if search_button_sql and st.session_state.get('selected_students'):
-        # Tomar una copia inmutable de la selección actual desde session_state
-        selection = list(st.session_state.get('selected_students', []))
-
-        # Desactivar temporalmente el multiselect para evitar modificaciones durante la búsqueda
-        st.session_state['_searching_sql'] = True
-
-        total_time = 0
-        results = []
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-        for i, student_name in enumerate(selection):
-            status_text.text(f"Buscando {i+1}/{len(selection)}: {student_name}...")
-            result, elapsed = search_student_sql(student_name)
-            total_time += elapsed
-            if result:
-                results.append(result)
-            progress_bar.progress((i + 1) / len(selection))
-
-        progress_bar.empty()
-        status_text.empty()
-
-        # Guardar resultados en session_state
-        st.session_state.sql_results = results
-        st.session_state.sql_time = total_time
-        st.session_state.sql_count = len(selection)
-
-        # Marcar que búsqueda finalizó
-        st.session_state['_searching_sql'] = False
-
-    # Mostrar resultados guardados (persistentes)
-    if st.session_state.sql_results is not None:
-        results = st.session_state.sql_results
-        total_time = st.session_state.sql_time
-        count = st.session_state.sql_count
-
-        st.success(f"Búsqueda completada: {len(results)}/{count} encontrados")
-
-        col_time1, col_time2, col_time3 = st.columns(3)
-        with col_time1:
-            st.metric("Tiempo TOTAL", f"{total_time:.4f}s")
-        with col_time2:
-            st.metric("Promedio", f"{total_time/count:.4f}s")
-        with col_time3:
-            st.metric("Búsquedas", count)
-
-        st.markdown("---")
-
-        # Mostrar resultados en un formato compacto
-        if results:
-            st.subheader(f"Resultados ({len(results)} estudiantes)")
-
-            for idx, result in enumerate(results, 1):
-                with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
-                    col_a, col_b = st.columns(2)
-
-                    with col_a:
-                        st.write(f"**Email:** {result['email']}")
-                        st.write(f"**Edad:** {result['edad']} años")
-                        st.write(f"**Promedio:** {result['promedio']}")
-                        st.write(f"**Universidad:** {result['universidad']}")
-
-                    with col_b:
-                        st.write(f"**Ciudad:** {result['ciudad_universidad']}")
-                        st.write(f"**País:** {result['pais_universidad']}")
-                        st.write(f"**Cursos:** {result['total_cursos']}")
-                        st.write(f"**Créditos:** {result['total_creditos']}")
+    # Verificar si PostgreSQL está disponible
+    pg_conn = get_postgres_connection()
+    if pg_conn is None:
+        if IS_CLOUD:
+            st.warning("""
+            ⚠️ **PostgreSQL no disponible en esta demo en línea**
+            
+            Streamlit Cloud no soporta bases de datos PostgreSQL locales.
+            
+            **Para ver la comparación completa:**
+            - Clona el repositorio
+            - Sigue las instrucciones del README
+            - Ejecuta localmente con ambas bases de datos
+            
+            La columna de la derecha (MongoDB) funciona perfectamente para demostrar el concepto.
+            """)
         else:
-            st.warning("No se encontraron estudiantes")
+            st.error("❌ PostgreSQL no está conectado. Verifica que el servidor esté corriendo.")
+    else:
+        st.info(f"Buscando {len(selected_students)} estudiante(s)")
+
+        # Botón para iniciar búsqueda SQL. Usamos la selección guardada en session_state
+        search_button_sql = st.button("Buscar TODOS en SQL", type="primary", key="sql_button", use_container_width=True)
+
+        if search_button_sql and st.session_state.get('selected_students'):
+            # Tomar una copia inmutable de la selección actual desde session_state
+            selection = list(st.session_state.get('selected_students', []))
+
+            # Desactivar temporalmente el multiselect para evitar modificaciones durante la búsqueda
+            st.session_state['_searching_sql'] = True
+
+            total_time = 0
+            results = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            for i, student_name in enumerate(selection):
+                status_text.text(f"Buscando {i+1}/{len(selection)}: {student_name}...")
+                result, elapsed = search_student_sql(student_name)
+                total_time += elapsed
+                if result:
+                    results.append(result)
+                progress_bar.progress((i + 1) / len(selection))
+
+            progress_bar.empty()
+            status_text.empty()
+
+            # Guardar resultados en session_state
+            st.session_state.sql_results = results
+            st.session_state.sql_time = total_time
+            st.session_state.sql_count = len(selection)
+
+            # Marcar que búsqueda finalizó
+            st.session_state['_searching_sql'] = False
+
+        # Mostrar resultados guardados (persistentes)
+        if st.session_state.sql_results is not None:
+            results = st.session_state.sql_results
+            total_time = st.session_state.sql_time
+            count = st.session_state.sql_count
+
+            st.success(f"Búsqueda completada: {len(results)}/{count} encontrados")
+
+            col_time1, col_time2, col_time3 = st.columns(3)
+            with col_time1:
+                st.metric("Tiempo TOTAL", f"{total_time:.4f}s")
+            with col_time2:
+                st.metric("Promedio", f"{total_time/count:.4f}s")
+            with col_time3:
+                st.metric("Búsquedas", count)
+
+            st.markdown("---")
+
+            # Mostrar resultados en un formato compacto
+            if results:
+                st.subheader(f"Resultados ({len(results)} estudiantes)")
+
+                for idx, result in enumerate(results, 1):
+                    with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
+                        col_a, col_b = st.columns(2)
+
+                        with col_a:
+                            st.write(f"**Email:** {result['email']}")
+                            st.write(f"**Edad:** {result['edad']} años")
+                            st.write(f"**Promedio:** {result['promedio']}")
+                            st.write(f"**Universidad:** {result['universidad']}")
+
+                        with col_b:
+                            st.write(f"**Ciudad:** {result['ciudad_universidad']}")
+                            st.write(f"**País:** {result['pais_universidad']}")
+                            st.write(f"**Cursos:** {result['total_cursos']}")
+                            st.write(f"**Créditos:** {result['total_creditos']}")
+            else:
+                st.warning("No se encontraron estudiantes")
 
 # COLUMNA DERECHA - NoSQL
 with col2:
@@ -494,13 +556,26 @@ Cuantos más estudiantes busques, más notoria será la diferencia de velocidad:
 st.sidebar.title("Información del Sistema")
 st.sidebar.markdown("---")
 
+# Mostrar si estamos en la nube o local
+if IS_CLOUD:
+    st.sidebar.info("🌐 Ejecutando en Streamlit Cloud")
+else:
+    st.sidebar.info("💻 Ejecutando localmente")
+
+st.sidebar.markdown("---")
+
 # Verificar conexiones
-if get_postgres_connection() is not None:
+pg_conn = get_postgres_connection()
+if pg_conn is not None:
     st.sidebar.success("✅ PostgreSQL conectado")
 else:
-    st.sidebar.error("❌ PostgreSQL no disponible")
+    if IS_CLOUD:
+        st.sidebar.warning("⚠️ PostgreSQL no disponible")
+    else:
+        st.sidebar.error("❌ PostgreSQL no disponible")
 
-if get_mongo_connection() is not None:
+mongo_db = get_mongo_connection()
+if mongo_db is not None:
     st.sidebar.success("✅ MongoDB conectado")
 else:
     st.sidebar.error("❌ MongoDB no disponible")
