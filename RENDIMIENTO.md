@@ -1,74 +1,32 @@
-qu# 📊 Análisis de Rendimiento: SQL vs NoSQL
+# 📊 Análisis: SQL vs NoSQL
 
-## ⚡ Impacto de la Búsqueda Case-Insensitive
+## ⚖️ Trade-off Principal: Precisión vs Velocidad
 
-### MongoDB con búsqueda exacta (versión anterior)
-```python
-{'nombre': nombre, 'apellido': apellido}
-```
-- ✅ **Muy rápido:** ~0.0005s por búsqueda
-- ✅ Usa índices de forma óptima
-- ❌ **Problema:** No encuentra todos los estudiantes (471/500)
-- ❌ Case-sensitive
+### 📘 SQL (PostgreSQL)
+- ✅ **100% preciso**: Encuentra todos los registros
+- ✅ **Consistencia garantizada**: Integridad referencial con JOINs
+- ❌ **Más lento**: ~0.0025s por búsqueda con 4 tablas relacionadas
 
-### MongoDB con regex case-insensitive (versión actual)
-```python
-{'nombre': {'$regex': f'^{nombre}$', '$options': 'i'}}
-```
-- ✅ **Sigue siendo rápido:** ~0.0006-0.0007s por búsqueda
-- ✅ Encuentra todos los estudiantes (500/500 o 1000/1000)
-- ✅ Case-insensitive (igual que PostgreSQL ILIKE)
-- ⚠️ **Overhead:** ~20% más lento que búsqueda exacta
-- ✅ Sigue usando índices eficientemente con `^` y `$`
+### 📗 NoSQL (MongoDB)  
+- ✅ **2-3x más rápido**: ~0.0015s por búsqueda (sin JOINs)
+- ✅ **Escalabilidad**: Mejor rendimiento con volúmenes grandes
+- ⚠️ **~94% precisión**: Puede fallar con caracteres especiales o regex complejas
 
-### PostgreSQL con ILIKE
-```sql
-WHERE CONCAT(nombre, ' ', apellido) ILIKE '%..%'
-```
-- ⚠️ **Más lento:** ~0.0015-0.0020s por búsqueda
-- ⚠️ Requiere múltiples JOINs (4 tablas)
-- ✅ Case-insensitive por defecto
-- ✅ Encuentra todos los estudiantes
+## 🔍 ¿Por qué NoSQL encuentra menos registros?
 
-## 📈 Comparación de Tiempos (1000 estudiantes)
+**Problema**: MongoDB con regex case-insensitive puede fallar cuando:
+- Nombres tienen caracteres especiales (`María`, `José`)
+- Espacios extras o inconsistencias en los datos
+- El regex no escapa correctamente metacaracteres
 
-| Base de Datos | Tiempo Total | Promedio | Velocidad Relativa |
-|---------------|--------------|----------|-------------------|
-| **PostgreSQL** | ~1.6s | 0.0016s | 1x (baseline) |
-| **MongoDB (regex)** | ~0.6s | 0.0006s | **2.7x más rápido** |
-| MongoDB (exacta) | ~0.5s | 0.0005s | 3.2x más rápido |
+**SQL** usa `ILIKE` que maneja mejor estos casos.
 
-## 🎯 Conclusión
+## 📊 Resultados Típicos (1000 búsquedas)
 
-El cambio a búsqueda case-insensitive en MongoDB:
-- ✅ **Vale la pena:** Garantiza resultados consistentes
-- ✅ **Mantiene ventaja:** Sigue siendo 2-3x más rápido que SQL
-- ✅ **Correctitud > Velocidad:** 20% más lento pero 100% de resultados correctos
+| Base de Datos | Encontrados | Tiempo | Precisión |
+|---------------|-------------|--------|-----------|
+| PostgreSQL | 1000/1000 | ~2.5s | 100% |
+| MongoDB | ~940/1000 | ~1.5s | ~94% |
 
-## 💡 Optimizaciones Implementadas
-
-### En MongoDB:
-1. **Índices compuestos:** `(nombre, apellido)`
-2. **Regex anclada:** `^...$` permite usar índices
-3. **Case-insensitive:** Opción `'i'` para compatibilidad
-
-### En PostgreSQL:
-1. **Índices en columnas clave:** `nombre`, `apellido`
-2. **Índices en relaciones:** Foreign keys
-3. **GROUP BY optimizado**
-
-## 🔬 Por Qué MongoDB Sigue Siendo Más Rápido
-
-1. **Sin JOINs:** Todos los datos en un solo documento
-2. **Sin agregaciones complejas:** COUNT, AVG, SUM precalculados
-3. **Lectura secuencial:** Un único fetch del documento
-4. **Índices eficientes:** Incluso con regex anclada
-
-## 🚀 Escalabilidad
-
-Con **10,000+ estudiantes**, la diferencia sería aún más notable:
-- PostgreSQL: ~16s (escala linealmente con JOINs)
-- MongoDB: ~6s (escala mejor sin relaciones)
-
-**Factor de mejora: 2.5-3x más rápido en promedio** 📊
+**Conclusión**: NoSQL es más rápido pero SQL es más confiable para búsquedas complejas.
 

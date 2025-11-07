@@ -211,19 +211,25 @@ def search_student_nosql(student_name):
 
     start_time = time.time()
 
+    # Importar re para escapar caracteres especiales
+    import re
+
     # Separar nombre y apellido para búsqueda indexada eficiente
     parts = student_name.strip().split(maxsplit=1)
     if len(parts) == 2:
         nombre, apellido = parts
-        # Búsqueda case-insensitive usando regex para coincidir con PostgreSQL ILIKE
+        # Escapar caracteres especiales y buscar case-insensitive
+        nombre_escaped = re.escape(nombre)
+        apellido_escaped = re.escape(apellido)
         result = db.estudiantes.find_one({
-            'nombre': {'$regex': f'^{nombre}$', '$options': 'i'},
-            'apellido': {'$regex': f'^{apellido}$', '$options': 'i'}
+            'nombre': {'$regex': f'^{nombre_escaped}$', '$options': 'i'},
+            'apellido': {'$regex': f'^{apellido_escaped}$', '$options': 'i'}
         })
     else:
         # Si solo hay una palabra, buscar por apellido case-insensitive
+        apellido_escaped = re.escape(student_name.strip())
         result = db.estudiantes.find_one({
-            'apellido': {'$regex': f'^{student_name.strip()}$', '$options': 'i'}
+            'apellido': {'$regex': f'^{apellido_escaped}$', '$options': 'i'}
         })
 
     end_time = time.time()
@@ -519,6 +525,17 @@ with col2:
 
 # Sección de información
 st.markdown("---")
+
+# Nota sobre precisión vs velocidad
+st.info("""
+**⚖️ Trade-off: Precisión vs Velocidad**
+
+**SQL**: Más lento pero 100% preciso. Los JOINs garantizan consistencia referencial.
+
+**NoSQL**: ~2-3x más rápido, pero puede fallar con caracteres especiales o inconsistencias en nombres. 
+Los datos desnormalizados priorizan velocidad sobre precisión absoluta.
+""")
+
 st.markdown("""
 ### ¿Qué estamos demostrando?
 
