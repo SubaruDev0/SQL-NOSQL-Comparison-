@@ -211,26 +211,15 @@ def search_student_nosql(student_name):
 
     start_time = time.time()
 
-    # Importar re para escapar caracteres especiales
-    import re
-
     # Separar nombre y apellido para búsqueda indexada eficiente
     parts = student_name.strip().split(maxsplit=1)
     if len(parts) == 2:
         nombre, apellido = parts
-        # Escapar caracteres especiales y buscar case-insensitive
-        nombre_escaped = re.escape(nombre)
-        apellido_escaped = re.escape(apellido)
-        result = db.estudiantes.find_one({
-            'nombre': {'$regex': f'^{nombre_escaped}$', '$options': 'i'},
-            'apellido': {'$regex': f'^{apellido_escaped}$', '$options': 'i'}
-        })
+        # Búsqueda EXACTA (sin regex) - más rápida y 100% precisa
+        result = db.estudiantes.find_one({'nombre': nombre, 'apellido': apellido})
     else:
-        # Si solo hay una palabra, buscar por apellido case-insensitive
-        apellido_escaped = re.escape(student_name.strip())
-        result = db.estudiantes.find_one({
-            'apellido': {'$regex': f'^{apellido_escaped}$', '$options': 'i'}
-        })
+        # Si solo hay una palabra, buscar por apellido
+        result = db.estudiantes.find_one({'apellido': student_name.strip()})
 
     end_time = time.time()
     elapsed_time = end_time - start_time
