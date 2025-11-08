@@ -211,15 +211,16 @@ def search_student_nosql(student_name):
 
     start_time = time.time()
 
-    # Separar nombre y apellido para búsqueda indexada eficiente
-    parts = student_name.strip().split(maxsplit=1)
-    if len(parts) == 2:
-        nombre, apellido = parts
-        # Búsqueda EXACTA (sin regex) - más rápida y 100% precisa
-        result = db.estudiantes.find_one({'nombre': nombre, 'apellido': apellido})
-    else:
-        # Si solo hay una palabra, buscar por apellido
-        result = db.estudiantes.find_one({'apellido': student_name.strip()})
+    # Buscar concatenando nombre y apellido como lo hace PostgreSQL
+    # Esto maneja correctamente nombres compuestos como "Jose Miguel" o "María Dolores"
+    result = db.estudiantes.find_one({
+        '$expr': {
+            '$eq': [
+                {'$concat': ['$nombre', ' ', '$apellido']},
+                student_name.strip()
+            ]
+        }
+    })
 
     end_time = time.time()
     elapsed_time = end_time - start_time
