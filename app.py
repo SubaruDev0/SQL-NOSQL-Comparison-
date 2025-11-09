@@ -330,6 +330,9 @@ with col_clear2:
         st.session_state.nosql_results = None
         st.session_state.nosql_time = 0
         st.session_state.nosql_count = 0
+        # Resetear contadores de paginación
+        st.session_state.sql_show_count = 20
+        st.session_state.nosql_show_count = 20
         st.rerun()
 
 st.markdown("---")
@@ -415,11 +418,18 @@ with col1:
 
             st.markdown("---")
 
-            # Mostrar resultados en un formato compacto
+            # Mostrar resultados en un formato compacto con paginación
             if results:
                 st.subheader(f"Resultados ({len(results)} estudiantes)")
 
-                for idx, result in enumerate(results, 1):
+                # Inicializar contador de visualización para SQL
+                if 'sql_show_count' not in st.session_state:
+                    st.session_state.sql_show_count = 20
+
+                # Mostrar solo los primeros N resultados
+                results_to_show = results[:st.session_state.sql_show_count]
+
+                for idx, result in enumerate(results_to_show, 1):
                     with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
                         col_a, col_b = st.columns(2)
 
@@ -434,6 +444,13 @@ with col1:
                             st.write(f"**País:** {result['pais_universidad']}")
                             st.write(f"**Cursos:** {result['total_cursos']}")
                             st.write(f"**Créditos:** {result['total_creditos']}")
+
+                # Botón "Ver más" si hay más resultados
+                if st.session_state.sql_show_count < len(results):
+                    remaining = len(results) - st.session_state.sql_show_count
+                    if st.button(f"Ver más ({min(20, remaining)} de {remaining} restantes)", key="sql_load_more"):
+                        st.session_state.sql_show_count += 20
+                        st.rerun()
             else:
                 st.warning("No se encontraron estudiantes")
 
@@ -491,11 +508,18 @@ with col2:
 
         st.markdown("---")
 
-        # Mostrar resultados en un formato compacto
+        # Mostrar resultados en un formato compacto con paginación
         if results:
             st.subheader(f"Resultados ({len(results)} estudiantes)")
 
-            for idx, result in enumerate(results, 1):
+            # Inicializar contador de visualización para NoSQL
+            if 'nosql_show_count' not in st.session_state:
+                st.session_state.nosql_show_count = 20
+
+            # Mostrar solo los primeros N resultados
+            results_to_show = results[:st.session_state.nosql_show_count]
+
+            for idx, result in enumerate(results_to_show, 1):
                 with st.expander(f"{idx}. {result['nombre']} {result['apellido']} - {result['carrera']}"):
                     col_a, col_b = st.columns(2)
 
@@ -510,6 +534,13 @@ with col2:
                         st.write(f"**País:** {result['pais_universidad']}")
                         st.write(f"**Cursos:** {result['total_cursos']}")
                         st.write(f"**Créditos:** {result['total_creditos']}")
+
+            # Botón "Ver más" si hay más resultados
+            if st.session_state.nosql_show_count < len(results):
+                remaining = len(results) - st.session_state.nosql_show_count
+                if st.button(f"Ver más ({min(20, remaining)} de {remaining} restantes)", key="nosql_load_more"):
+                    st.session_state.nosql_show_count += 20
+                    st.rerun()
         else:
             st.warning("❌ No se encontraron estudiantes")
 
