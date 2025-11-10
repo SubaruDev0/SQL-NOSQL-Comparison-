@@ -123,6 +123,64 @@ db.dropDatabase()
 
 ---
 
+## 3.b) Si `mongosh` no está instalado (alternativas)
+
+En algunas distribuciones `mongosh` no está instalado por defecto. Si al ejecutar `mongosh` recibes "mongosh: no se encontró la orden", tienes dos opciones:
+
+1) Instalar `mongosh` (recomendado):
+
+- Ubuntu / Debian (apt):
+
+```bash
+# Importante: usa la guía oficial para la versión más reciente.
+# Ejemplo mínimo para instalar mongosh (Debian/Ubuntu):
+curl -fsSL https://pgp.mongodb.com/server-6.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
+echo "deb [signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+sudo apt update
+sudo apt install -y mongodb-mongosh
+
+# Verifica
+mongosh --version
+```
+
+2) Alternativa rápida sin instalar nada: usar el script Python incluido en este proyecto `mongo_inspect.py`.
+
+- Uso:
+
+```bash
+python mongo_inspect.py        # lista DBs, cuenta colecciones y muestra un documento de ejemplo
+python mongo_inspect.py --dbs  # solo lista bases de datos
+python mongo_inspect.py --count # cuenta colecciones/docs en `universidad_db`
+python mongo_inspect.py --sample # muestra un documento de ejemplo
+```
+
+- Ejemplo de salida:
+
+```
+Bases de datos encontradas:
+  - admin
+  - config
+  - local
+  - universidad_db
+
+Colecciones en 'universidad_db': 1
+  - estudiantes: 10000 documentos
+
+Documento de ejemplo (estudiantes):
+  id: 1
+  nombre: Isabela
+  apellido: Guzman 1
+  email: gabrielmunoz@example.com
+  edad: 27
+  carrera: Psicologa
+  promedio: 6.95
+  universidad.nombre: Universidad Farmacetica Pedro S.Coop.
+```
+
+> El script usa `pymongo` y asume MongoDB local en `localhost:27017`. Si tu Mongo está en otra URI, modifica `mongo_inspect.py` en la línea de conexión.
+
+---
+
 ## 4) Dónde se crean y cargan las bases / datos en el proyecto
 
 - `cargar_datos.py` — script rápido que recrea la base `universidad_db` en PostgreSQL y copia los registros a MongoDB (configurable para 1k / 10k registros según parámetros en el script). Es el script recomendado para desarrollo local rápido.
@@ -317,4 +375,3 @@ Si quieres, puedo:
 - Añadir pequeños scripts de comprobación automatizados (pytest o scripts de verificación rápida).
 
 Fin del documento.
-
