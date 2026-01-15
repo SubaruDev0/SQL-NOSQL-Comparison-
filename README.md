@@ -311,13 +311,3 @@ SqlNosql/
 - 10,000 documentos completos
 
 ---
-
-## 🎉 ¡Listo!
-
-Tu demo está configurada y funcionando. Solo necesitas:
-- ✅ Practicar tu discurso
-- ✅ Probar buscar varios estudiantes
-- ✅ Preparar respuestas para preguntas
-
-**¡Buena suerte con la presentación! 🚀**
-
